@@ -1,5 +1,5 @@
-# Backup and Cleaner Lib
-# Policy: ftp, read, write + for backup: policy, test
+# LED Lib
+# Policy: read, write
 # ver 1.0 (15.04.2020)
 # Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
 # GitHub: nrgiver/MikroTikScripts

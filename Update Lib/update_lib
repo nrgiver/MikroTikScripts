@@ -66,7 +66,7 @@
 		:log debug ($scriptName."->updateRouterBoard: RouterBoard needs to update");
 		
 		# Create backup
-		[[:parse [/system script get backup_and_cleaner_lib source]] action=createBackup reason="before_update_RouterBoard"];
+		[[:parse [/system script get backup_lib source]] action=createBackup reason="before_update_RouterBoard"];
 		
 		# Upgrade RouterBoard
 		:execute script="/system routerboard upgrade";
@@ -101,7 +101,7 @@
 		:log debug ($scriptName."->updateRouterOS: RouterOS needs to update");
 		
 		# Create backup
-		[[:parse [/system script get backup_and_cleaner_lib source]] action=createBackup reason="before_update_RouterOS"];
+		[[:parse [/system script get backup_lib source]] action=createBackup reason="before_update_RouterOS"];
 		
 		# Upgrade RouterOS
 		:execute script="/system package update download";
