@@ -2,17 +2,7 @@
 
 ## ABOUT
 
-The script is designed to automate the creation of backups
-
-The script allows you to configure the cleaning of old backups
-
-The script supports saving backups to the USB drive
-
-The script contains functions:
-
- - getBackupsPath - Return $backupsPath
- - createBackup - Create backup and export with mark about your $reason
- - clearOldBackup - Clear old backup over then $overMonths months
+The script is created to be able to call different functions depending on the number of Press Button
  
 The script needs libraries:
 
