@@ -1,0 +1,139 @@
+# Guest Network Lib
+# Policy: read, write
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  getGuestInterfacesArray - return $guestInterfaces
+#  checkGuestStatus - check status guest network ans set same by Led and Guest network
+#  switchGuestStatus - switch Status Guest network and Led
+# 
+# Examples from other scripts:
+#  Get Interfases Guest Network
+#   :local guestInterfaces [[:parse [/system script get guest_lib source]] action=getGuestInterfacesArray];
+#  Check and Set same status Guest network and Led (ex. for Sheduler)
+#   [[:parse [/system script get guest_lib source]] action=checkGuestStatus];
+#  Switch Status Guest Network (ex. for Button)
+#   [[:parse [/system script get guest_lib source]] action=switchGuestStatus];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "guest_lib";
+
+# Array interfaces by guest network (first is main interface for check)
+:local guestInterfaces {"wlan-guest-2GHz";"wlan-guest-5GHz"};
+
+# Name of Led
+:local ledName "user-led";
+	
+	
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+# Get Guest Network Status
+#   Args: guestInterfaces=$guestInterfaces
+#   Return: ("on"|"off")
+:local getGuestStatus do={
+	:local guestStatus "on";
+	:if ([/interface get [find name=($guestInterfaces->0)] disabled] = true) do={:set guestStatus "off";};
+	:return $guestStatus;
+};
+
+# Check and set the same status by guest interfaces
+#   Args: guestInterfaces=$guestInterfaces trueReturnValue=(false|true) replaceValue=("yes"|"no")
+#   Return: -
+:local checkAndSetSameStatusGuestInterfaces do={
+	:for i from=0 to=([:len $guestInterfaces]-1) step=1 do={
+		:if ([/interface get [find name=($guestInterfaces->$i)] disabled] = $trueReturnValue) do={
+			/interface set disabled=$replaceValue [find name=($guestInterfaces->$i)];
+		};
+	};
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Return $guestInterfaces
+#   Args: -
+#   Return: $guestInterfaces
+:if ($action = "getGuestInterfacesArray") do={
+	:set unknowAction false;
+	:return $guestInterfaces;
+};
+
+# Switch Guest Status
+#   Args: -
+#   Return: -
+:if ($action = "switchGuestStatus") do={
+
+	:set unknowAction false;
+	
+	# Get Guest Status
+	:local guestStatus [$getGuestStatus guestInterfaces=$guestInterfaces];
+	
+	# Set true return value and replace value
+	:local trueReturnValue false;
+	:local replaceValue "yes";
+	:local needLedStatus "off";
+	:if ($guestStatus = "off") do={
+		:set trueReturnValue true;
+		:set replaceValue "no";
+		:set needLedStatus "on";
+	};
+	
+	# Check and set the same status by guest interfaces
+	$checkAndSetSameStatusGuestInterfaces guestInterfaces=$guestInterfaces trueReturnValue=$trueReturnValue replaceValue=$replaceValue;
+	
+	# Check and set the same status by Led and Guest Network
+	[[:parse [/system script get led_lib source]] action=setStatusLed status=$needLedStatus];
+};
+
+# Check Guest Status
+#  Args: -
+#  Return: -
+:if ($action = "checkGuestStatus") do={
+
+	:set unknowAction false;
+	
+	# Get Guest Status
+	:local guestStatus [$getGuestStatus guestInterfaces=$guestInterfaces];
+	
+	# Set true return value and replace value
+	:local trueReturnValue false;
+	:local replaceValue "yes";
+	:if ($guestStatus = "on") do={
+		:set trueReturnValue true;
+		:set replaceValue "no";
+	};
+	
+	# Check and set the same status by guest interfaces
+	$checkAndSetSameStatusGuestInterfaces guestInterfaces=$guestInterfaces trueReturnValue=$trueReturnValue replaceValue=$replaceValue;
+	
+	# Check and set the same status by Led and Guest Network
+	[[:parse [/system script get led_lib source]] action=setStatusLed status=$guestStatus];
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};

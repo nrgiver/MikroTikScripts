@@ -1,0 +1,160 @@
+# Backup and Cleaner Lib
+# Policy: ftp, read, write, policy, test
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  getBackupsPath - Return $backupsPath
+#  createBackup - Create backup and export with mark about your reason
+#    reason=""
+#  clearOldBackup - Clear old backup over then $overMonths months
+#    overMonths=0
+# 
+# Examples from other scripts:
+#  Get Backups Path
+#   :local backupsPath [[:parse [/system script get backup_lib source]] action=getBackupsPath];
+#  Create backup and export with mark about your reason
+#   [[:parse [/system script get backup_lib source]] action=createBackup reason="auto_every_weak"];
+#  Clear old backups over then 2 months (only backups younger than 2 months will be saved)
+#   [[:parse [/system script get backup_lib source]] action=clearOldBackup overMonths=2];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "backup_lib";
+
+# Backups Path
+:local backupsPath "/backups/";
+
+# Try save backup to usb drive if it exists
+:local trySaveToUsbDrive true;
+
+
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Return $backupsPath
+#   Args: -
+#   Return: array $backupsPath
+:if ($action = "getBackupsPath") do={
+	:set unknowAction false;
+	:log debug ($scriptName." return backupsPath=".$backupsPath);
+	:return $backupsPath;
+};
+
+# Create backup and export with mark about your reason
+#   Args: reason=""
+#   Return: -
+:if ($action = "createBackup") do={
+
+	:set unknowAction false;
+	
+	# Get path with timestamp and reason
+	:local path ($backupsPath.[[:parse [/system script get date_lib source]] action=getTimeStamp]);
+	:if ([:len $reason] > 0) do={
+		:set path ($path."(".$reason.")/");
+	};
+	
+	# Add path's root flash
+	
+	#  If try save to usb drive is true
+	:if ($trySaveToUsbDrive = true) do={
+		# Try get usb drive name else set flash
+		:do {
+			:set path ([/disk get number=0 name]."/".[/system identity get name].$path);
+		} on-error={
+			:set path ("flash".$path);
+		};
+	};
+	
+	#  If try save to usb drive is false set flash
+	:if ($trySaveToUsbDrive = false) do={
+		:set path ("flash".$path);
+	};
+	
+	# Check and create dirs
+	[[:parse [/system script get explorer_lib source]] action=makeDir path=$path];
+	
+	# Create backup and export
+	/system backup save name=($path."/backup");
+	/export file=($path."/export");
+	
+	:log debug ($scriptName."->".$action." create backup path=".$path);
+};
+
+# Clear old backup over then $overMonths months
+#   Args: overMonths=0
+#   Return: -
+:if ($action = "clearOldBackup") do={
+
+	:set unknowAction false;
+	
+	# Get monthArray
+	:local months [[:parse [/system script get date_lib source]] action=getMonthArray];
+	
+	# Get Execute Months Array
+	:local executeMonths;
+	
+	:local endNumArr [:find $months [:pick [/system clock get date] 0 3]];
+	:local startNumArr ($endNumArr - $overMonths);
+	
+	:if ($startNumArr > -2) do {
+		:set executeMonths [:pick $months ($startNumArr + 1) ($endNumArr + 1)];
+	};
+	:if ($startNumArr < -1) do {
+		:set startNumArr (12 + $startNumArr);
+		:set executeMonths [:pick $months ($startNumArr + 1) [:len $months]];
+		:set executeMonths ($executeMonths, [:pick $months 0 ($endNumArr + 1)]);
+	};
+	
+	# Create RegExp filter with months
+	:local monthRegString "";
+	
+	:for i from=0 to=([:len $months]-1) step=1 do={
+		:if ([:len [:find $executeMonths ($months->$i) -1]] = 0) do={
+			:set monthRegString ($monthRegString.($months->$i)."|");
+		};
+	};
+	
+	:set monthRegString [:pick $monthRegString 0 ([:len $monthRegString]-1)];
+	
+	# Remove files in flash and USB drive if it exist
+	/file remove [find type="directory" and name ~("^".("flash".$backupsPath).".*\$") and creation-time ~("^(".$monthRegString.").*\$")];
+	
+	:if ($trySaveToUsbDrive = true) do={
+		:do {
+			/file remove [find type="directory" and name ~("^".([/disk get number=0 name]."/".[/system identity get name].$backupsPath).".*\$") and creation-time ~("^(".$monthRegString.").*\$")];
+		} on-error={
+			:log debug ($scriptName."->".$action." USB drive not founded");
+		};
+	};
+
+	:log debug ($scriptName."->".$action." removed Backups of the months: ".$monthRegString);
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};

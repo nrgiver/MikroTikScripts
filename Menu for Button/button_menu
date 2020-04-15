@@ -1,0 +1,88 @@
+# Menu for Press Button
+# Policy: ftp, read, write + for backup: policy, test
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "button_menu";
+
+# File name for check Running and get Press Count
+:local fileCount "button_menu_count.txt";
+
+# Wait Time
+:local waitTime 7;
+
+
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+
+# MAIN
+
+:log debug ($scriptName." run");
+
+# Check Running
+
+# If non first press
+:if ([:len [/file find name=$fileCount]] > 0) do={
+	
+	# Add count press
+	:local buttonMenuCount ([:tonum [/file get $fileCount contents]] + 1);
+	/file set $fileCount contents=$buttonMenuCount;
+	
+	:log debug ($scriptName." not first run and set count: ".$buttonMenuCount);
+	
+	# Blink Led press count
+	[[:parse [/system script get led_lib source]] action=blinkLed count=$buttonMenuCount];
+};
+
+# If first press
+:if ([:len [/file find name=$fileCount]] = 0) do={
+		
+	# Create threat and press count
+	/file print file=$fileCount;
+	delay 1;
+	
+	# Create Press Count
+	:local buttonMenuCount 1;
+	/file set $fileCount contents=$buttonMenuCount;
+	
+	# Blink Led press count
+	[[:parse [/system script get led_lib source]] action=blinkLed count=$buttonMenuCount];
+	
+	# Wait other press
+	:log debug ($scriptName." first run, set count: ".$buttonMenuCount." and start wait ".$waitTime."...");
+	:delay $waitTime;
+	
+	# Get press count
+	:set buttonMenuCount [:tonum [/file get $fileCount contents]];
+	:log debug ("End wait, count:".$buttonMenuCount);
+	
+	# Remove all files
+	/file remove $fileCount;
+	
+	# Switch event by press count
+	:if ($buttonMenuCount = 1) do={
+		#Switch Dark Mode
+		[[:parse [/system script get led_lib source]] action=switchDarkMode];
+	};
+	:if ($buttonMenuCount = 2) do={
+		#Switch Guest Network
+		[[:parse [/system script get guest_lib source]] action=switchGuestStatus];
+	};
+	:if ($buttonMenuCount = 3) do={
+		#Create Backup
+		[[:parse [/system script get backup_lib source]] action=createBackup reason="press_button"];
+	};
+};

@@ -1,0 +1,86 @@
+# Date Lib
+# Policy: read
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  getMonthArray - return $guestInterfaces
+#  getTimeStamp - get TimeStamp formated YYYYMMDD-hhmmss
+# 
+# Examples from other scripts:
+#  Get Array of Months in RouterOS
+#   :local months [[:parse [/system script get date_lib source]] action=getMonthArray];
+#  get TimeStamp formated YYYYMMDD-hhmmss
+#   :local timestamp [[:parse [/system script get date_lib source]] action=getTimeStamp];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "date_lib";
+
+# Array interfaces by guest network (first is main interface for check)
+:local months {"jan";"feb";"mar";"apr";"may";"jun";"jul";"aug";"sep";"oct";"nov";"dec"};
+
+
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Return $months
+#   Args: -
+#   Return: array $months
+:if ($action = "getMonthArray") do={
+	:set unknowAction false;
+	:log debug ($scriptName." return monthsArray=".$months);
+	:return $months;
+};
+
+# Get timestamp YYYYMMDD-hhmmss
+#   Args: -
+#   Return: str timestamp YYYYMMDD-hhmmss
+:if ($action = "getTimeStamp") do={
+
+	:set unknowAction false;
+	
+	# Get date's vars
+	:local year ([:pick [/system clock get date] 7 11]);
+	:local month ([:find $months [:pick [/system clock get date] 0 3]] + 1);
+	:if ($month < 10) do={:set month ("0" . $month);};
+	:local day ([:pick [/system clock get date] 4 6]);
+	
+	# Get time's vars
+	:local hour ([:pick [/system clock get time] 0 2]);
+	:local minute ([:pick [/system clock get time] 3 5]);
+	:local second ([:pick [/system clock get time] 6 8]);
+	
+	:local result ($year.$month.$day."-".$hour.$minute.$second);
+	:log debug ($scriptName." return timestamp=".$result);
+	
+	:return $result;
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};

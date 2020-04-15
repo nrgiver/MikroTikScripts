@@ -1,0 +1,154 @@
+# Backup and Cleaner Lib
+# Policy: ftp, read, write + for backup: policy, test
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  switchDarkMode - Switch Dark Mode
+#  setStatusLed - Check and set the status Led
+#  blinkLed - Blink Led $count times
+# 
+# Examples from other scripts:
+#  On Led
+#   [[:parse [/system script get led_lib source]] action=setStatusLed status=on];
+#  Blink Led 5 times
+#   [[:parse [/system script get led_lib source]] action=blinkLed count=5];
+#  Switch Dark Mode
+#   [[:parse [/system script get led_lib source]] action=switchDarkMode];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "led_lib";
+
+# Name of Led
+:local ledName "user-led";
+
+# Blink timer
+:local ledBlinkTime 250ms;
+
+# Modes for Dark mode (after-1h, after-1min, immediate, never)
+:local darkModes {"never";"after-1min"};
+	
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Switch Dark Mode
+#   Args: -
+#   Return: -
+:if ($action = "switchDarkMode") do={
+	
+	:set unknowAction false;
+	
+	# Get settings
+	:local ledSet [/system leds settings get all-leds-off];
+	
+	# Get new setting
+	:local newSet ($darkModes->0);
+	:if ($ledSet = $newSet) do={
+		:set newSet ($darkModes->1);
+	};
+	
+	# Set new setting
+	/system leds settings set all-leds-off=$newSet;
+	
+	:log debug ($scriptName."->switchDarkMode: set led all-leds-off=".$newSet);
+};
+
+# Check and set the status Led
+#   Args: status=("on"|"off")
+#   Return: -
+:if ($action = "setStatusLed") do={
+	
+	:set unknowAction false;
+	
+	# Get Led's Rule
+	:local rule [/system leds get [find leds=$ledName]];
+	
+	# If the rule exists
+	:if ([:len $rule] > 0) do={
+	
+		# If disabled then enable
+		:if ($rule->"disabled" = true) do={
+			/system leds set disabled=no [find leds=$ledName];
+		};
+	
+		# If incorrect type then set correct type
+		:if ($rule->"type" != $status or ($rule->"type" != "on" and $rule->"type" != "off")) do={
+			/system leds set type=$status [find leds=$ledName];
+		};
+	};
+	
+	# If the rule does not exist then create correct rule
+	:if ([:len $rule] = 0) do={
+		/system leds add leds=$ledName disabled=no type=$status;
+	};
+	
+	:log debug ($scriptName."->setStatusLed: set led status=".$status);
+};
+
+# Blink Led $count times
+#   Args: count=0
+#   Return: -
+:if ($action = "blinkLed") do={
+
+	:set unknowAction false;
+	
+	# Get Led's Rule
+	:local rule [/system leds get [find leds=$ledName]];
+	
+	# If the rule exists
+	:if ([:len $rule] > 0) do={
+	
+		# If disabled then enable
+		:if ($rule->"disabled" = true) do={
+			/system leds set disabled=no [find leds=$ledName];
+		};
+	
+		# If incorrect type then set correct type
+		:if ($rule->"type" != "off") do={
+			/system leds set type=off [find leds=$ledName];
+		};
+	};
+	
+	# If the rule does not exist then create correct rule
+	:if ([:len $rule] = 0) do={
+		/system leds add leds=$ledName disabled=no type=off;
+	};
+	
+	:for i from=0 to=($count-1) step=1 do={
+		delay $ledBlinkTime;
+		/system leds set disabled=no type=on [find leds=$ledName];
+		delay $ledBlinkTime;
+		/system leds set disabled=no type=off [find leds=$ledName];
+	};
+	
+	:log debug ($scriptName."->blinkLed: blink led ".$count." times");
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};

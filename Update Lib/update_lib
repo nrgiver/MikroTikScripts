@@ -1,0 +1,119 @@
+# Update Lib
+# Policy: ftp, reboot, read, write + for backup: policy, test
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  updateRouterBoard - Check new version RouterBoard and if it exists then Create Backup and Update
+#  updateRouterOS - Check new version RouterOS and if it exists then Create Backup and Update
+# 
+# Examples from other scripts:
+#  Check new version RouterBoard and if it exists then Create Backup and Update
+#   [[:parse [/system script get update_lib source]] action=updateRouterBoard];
+#  Check new version RouterOS and if it exists then Create Backup and Update
+#   [[:parse [/system script get update_lib source]] action=updateRouterOS];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "update_lib";
+
+
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Check new version RouterBoard and if it exists then Create Backup and Update
+#   Args: -
+#   Return: -
+:if ($action = "updateRouterBoard") do={
+
+	:set unknowAction false;
+	
+	# Check version RouterBoard
+	:local currentVersion [/system routerboard get current-firmware];
+	:local lastVersion [/system routerboard get upgrade-firmware];
+	
+	# If current version is last
+	:if ($currentVersion = $lastVersion) do={
+		:log debug ($scriptName."->updateRouterBoard: RouterBoard has last version");
+	};
+	
+	# If exist new version
+	:if ($currentVersion != $lastVersion) do={
+		
+		:log debug ($scriptName."->updateRouterBoard: RouterBoard needs to update");
+		
+		# Create backup
+		[[:parse [/system script get backup_and_cleaner_lib source]] action=createBackup reason="before_update_RouterBoard"];
+		
+		# Upgrade RouterBoard
+		:execute script="/system routerboard upgrade";
+		
+		# Reboot system
+		:delay 5;
+		:execute script="/system reboot";
+	};
+};
+
+# Check new version RouterOS and if it exists then Create Backup and Update
+#   Args: -
+#   Return: -
+:if ($action = "updateRouterOS") do={
+
+	:set unknowAction false;
+	
+	# Check version RouterBoard
+	/system package update check-for-updates;
+	
+	:local currentVersion [/system package update get installed-version];
+	:local lastVersion [/system package update get latest-version];
+	
+	# If current version is last
+	:if ($currentVersion = $lastVersion) do={
+		:log debug ($scriptName."->updateRouterOS: RouterOS has last version");
+	};
+	
+	# If exist new version
+	:if ($currentVersion != $lastVersion) do={
+		
+		:log debug ($scriptName."->updateRouterOS: RouterOS needs to update");
+		
+		# Create backup
+		[[:parse [/system script get backup_and_cleaner_lib source]] action=createBackup reason="before_update_RouterOS"];
+		
+		# Upgrade RouterOS
+		:execute script="/system package update download";
+		:execute script="/system package update install";
+		
+		# Reboot system
+		:delay 5;
+		:execute script="/system reboot";
+	};
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};

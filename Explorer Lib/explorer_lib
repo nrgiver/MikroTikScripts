@@ -1,0 +1,118 @@
+# Explorer Lib
+# Policy: ftp, read, write
+# ver 1.0 (15.04.2020)
+# Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
+# GitHub: nrgiver/MikroTikScripts
+# 
+# Arg "action":
+#  makeDir - Check and create dir by SMB mythod
+#    args: path=""
+# 
+# Examples from other scripts:
+#  Check exist and create dirs by path
+#   [[:parse [/system script get explorer_lib source]] action=makeDir path="flash/dir/subdir/"];
+
+
+# CONFIG
+
+# Name of script for print in error and log
+:local scriptName "explorer_lib";
+
+# Free SMB Share name for create dir
+:local smbname "tempforcratedir";
+
+
+# PRIVATE FUNCTIONS
+
+# Error
+#   Args: scriptName=$scriptName message=""
+#   Return: -
+:local errorHandler do={
+	:log error ($scriptName.": ".$message);
+	:error ($scriptName.": ".$message);
+};
+
+# Parser string to Array
+#   Args: scriptName=$scriptName string="" delimiter=""
+#   Return: array
+:local parseToArray do={
+	
+	# Value to cut
+	:local start -1;
+	:local pos;
+	
+	# Result Array
+	:local resArray;
+	
+	# Check exist delimiter in the end of string
+	:local inputString $string;
+	:if ([:len [:find $inputString $delimiter ([:len $inputString]-([:len $delimiter]+1))]] = 0) do={
+		:set inputString ($inputString.$delimiter);
+	};
+	
+	# Cutting loop
+	:while ($start < [:len $inputString]) do={
+		:set pos [:find $inputString $delimiter $start];
+		:set resArray ($resArray, [:pick $inputString $start $pos])
+		:set start ($pos+[:len $delimiter]);
+	};
+	
+	:log debug ($scriptName."->parseToArray return: ".[:tostr $resArray]);
+	:return $resArray;
+};
+
+# Check exist and create directory by SMB method
+#   Args: scriptName=$scriptName path="" smbname=""
+#   Return: -
+:local checkAndCreateDirSMB do={
+	:if ([:len [/file find name=$path and type="directory"]] < 1) do={
+	
+		/ip smb shares add name=$smbname directory=$path;
+		/ip smb shares remove [find name=$smbname];
+		
+		:log debug ($scriptName."->checkAndCreateDirSMB create dir: ".$path);
+	};
+};
+
+
+# PUBLIC FUNCTIONS
+
+:log debug ($scriptName." run this action=".$action." path=".$path);
+
+# Check argument "action"
+:local unknowAction true;
+
+:if ([:len $action] = 0) do={
+	:set unknowAction false;
+	$errorHandler scriptName=$scriptName message=("The argument \"action\" has not been set");
+};
+
+# Check and create dir by SMB mythod
+#   Args: path=""
+#   Return: -
+:if ($action = "makeDir") do={
+
+	:set unknowAction false;
+	
+	# Check argument "path"
+	:if ([:len $path] = 0) do={
+		$errorHandler scriptName=$scriptName message=("makeDir: The argument \"path\" has not been set");
+	};
+	
+	# Get array of dirs
+	:local pathArray [$parseToArray scriptName=$scriptName string=$path delimiter="/"];
+	
+	# Create dirs in loop
+	:local createdPath ($pathArray->0);
+	:for i from=1 to=([:len $pathArray]-1) step=1 do={
+		:set createdPath ($createdPath."/".($pathArray->$i));
+		$checkAndCreateDirSMB scriptName=$scriptName path=$createdPath smbname=$smbname;
+	};
+	
+	:log debug ($scriptName."->".$action." create path=".$createdPath);
+};
+
+# Unknow action
+:if ($unknowAction = true) do={
+	$errorHandler scriptName=$scriptName message=("Unknow action \"".$action."\"");
+};
