@@ -1,18 +1,21 @@
 # Update Lib
 # Policy: ftp, reboot, read, write + for backup: policy, test
-# ver 1.0 (15.04.2020)
+# ver 1.1 (02.06.2020)
 # Tested on MikroTik hAp ac^2 (RouterBoard: 6.46.5, RouterOS:6.46.5)
 # GitHub: nrgiver/MikroTikScripts
 # 
 # Arg "action":
 #  updateRouterBoard - Check new version RouterBoard and if it exists then Create Backup and Update
 #  updateRouterOS - Check new version RouterOS and if it exists then Create Backup and Update
+#  updateCACerts - Update CA Certificates (Ex. for DNS over HTTPS)
 # 
 # Examples from other scripts:
 #  Check new version RouterBoard and if it exists then Create Backup and Update
 #   [[:parse [/system script get update_lib source]] action=updateRouterBoard];
 #  Check new version RouterOS and if it exists then Create Backup and Update
 #   [[:parse [/system script get update_lib source]] action=updateRouterOS];
+#  Update CA Certificates
+#   [[:parse [/system script get update_lib source]] action=updateCACerts];
 
 
 # CONFIG
@@ -57,13 +60,13 @@
 	
 	# If current version is last
 	:if ($currentVersion = $lastVersion) do={
-		:log debug ($scriptName."->updateRouterBoard: RouterBoard has last version");
+		:log debug ($scriptName."->".$action.": RouterBoard has last version");
 	};
 	
 	# If exist new version
 	:if ($currentVersion != $lastVersion) do={
 		
-		:log debug ($scriptName."->updateRouterBoard: RouterBoard needs to update");
+		:log debug ($scriptName."->".$action.": RouterBoard needs to update");
 		
 		# Create backup
 		[[:parse [/system script get backup_lib source]] action=createBackup reason="before_update_RouterBoard"];
@@ -92,13 +95,13 @@
 	
 	# If current version is last
 	:if ($currentVersion = $lastVersion) do={
-		:log debug ($scriptName."->updateRouterOS: RouterOS has last version");
+		:log debug ($scriptName."->".$action.": RouterOS has last version");
 	};
 	
 	# If exist new version
 	:if ($currentVersion != $lastVersion) do={
 		
-		:log debug ($scriptName."->updateRouterOS: RouterOS needs to update");
+		:log debug ($scriptName."->".$action.": RouterOS needs to update");
 		
 		# Create backup
 		[[:parse [/system script get backup_lib source]] action=createBackup reason="before_update_RouterOS"];
@@ -111,6 +114,25 @@
 		:delay 5;
 		:execute script="/system reboot";
 	};
+};
+
+# Update CA Certificates
+#   Args: -
+#   Return: -
+:if ($action = "updateCACerts") do={
+
+	:set unknowAction false;
+	
+	# Download CA Certificates
+	/tool fetch url=https://curl.haxx.se/ca/cacert.pem;
+	
+	# Import CA Certificates
+	/certificate import file-name=cacert.pem passphrase="";
+	
+	# Remove CA Certificates
+	/file remove cacert.pem;
+	
+	:log debug ($scriptName."->".$action.": CA Certificates have been updated");
 };
 
 # Unknow action

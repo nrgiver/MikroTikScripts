@@ -8,6 +8,7 @@ The script contains functions:
 
  - updateRouterBoard - Check new version RouterBoard and if it exists then Create Backup and Update
  - updateRouterOS - Check new version RouterOS and if it exists then Create Backup and Update
+ - updateCACerts - Update CA Certificates (Ex. for DNS over HTTPS)
  
 The script needs libraries:
 
@@ -29,5 +30,9 @@ Check new version RouterBoard and if it exists then Create Backup and Update (ex
 Check new version RouterOS and if it exists then Create Backup and Update (ex. Sheduler)
 
       [[:parse [/system script get update_lib source]] action=updateRouterOS];
+
+Update CA Certificates (ex. Sheduler)
+
+      [[:parse [/system script get update_lib source]] action=updateCACerts];
 
 [`nrgiver/MikroTikScripts`](https://github.com/nrgiver/MikroTikScripts)
